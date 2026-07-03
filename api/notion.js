@@ -11,99 +11,55 @@ const DATABASES = {
   presupuestos: "38f69496-804b-80a6-8a42-f34225e8acf9",
 };
 
-async function leerBase(databaseId) {
-  let results = [];
-  let cursor = undefined;
+async function propiedades(databaseId) {
 
-  do {
-    const response = await notion.databases.query({
-      database_id: databaseId,
-      start_cursor: cursor,
-    });
+  const respuesta = await notion.databases.query({
+    database_id: databaseId,
+    page_size: 1
+  });
 
-    results.push(...response.results);
+  if (!respuesta.results.length) {
+    return {};
+  }
 
-    cursor = response.has_more
-      ? response.next_cursor
-      : undefined;
+  return respuesta.results[0].properties;
 
-  } while (cursor);
-
-  return results;
 }
 
-function texto(prop) {
-  if (!prop) return "";
-
-  if (prop.title)
-    return prop.title.map(t => t.plain_text).join("");
-
-  if (prop.rich_text)
-    return prop.rich_text.map(t => t.plain_text).join("");
-
-  return "";
-}
-
-function numero(prop) {
-  if (!prop) return 0;
-  return prop.number ?? 0;
-}
-
-function seleccion(prop) {
-  if (!prop) return "";
-  return prop.select?.name ?? "";
-}
-
-function checkbox(prop) {
-  if (!prop) return false;
-  return prop.checkbox ?? false;
-}
-
-function fecha(prop) {
-  if (!prop) return null;
-  return prop.date?.start ?? null;
-}
-
-async function obtenerDatos() {
+async function obtenerEstructura() {
 
   const [
     cuentas,
     categorias,
     movimientos,
     presupuestos
+
   ] = await Promise.all([
 
-    leerBase(DATABASES.cuentas),
-    leerBase(DATABASES.categorias),
-    leerBase(DATABASES.movimientos),
-    leerBase(DATABASES.presupuestos)
+    propiedades(DATABASES.cuentas),
+    propiedades(DATABASES.categorias),
+    propiedades(DATABASES.movimientos),
+    propiedades(DATABASES.presupuestos)
 
   ]);
 
   return {
 
-    cuentas,
-    categorias,
-    movimientos,
-    presupuestos,
+    cuentas: Object.fromEntries(
+      Object.entries(cuentas).map(([k, v]) => [k, v.type])
+    ),
 
-    resumen: {
+    categorias: Object.fromEntries(
+      Object.entries(categorias).map(([k, v]) => [k, v.type])
+    ),
 
-      totalCuentas: cuentas.length,
-      totalCategorias: categorias.length,
-      totalMovimientos: movimientos.length,
-      totalPresupuestos: presupuestos.length,
+    movimientos: Object.fromEntries(
+      Object.entries(movimientos).map(([k, v]) => [k, v.type])
+    ),
 
-      patrimonio: cuentas.reduce((sum, page) => {
-
-        const saldo = Object.values(page.properties)
-          .find(p => p.type === "number");
-
-        return sum + (saldo?.number ?? 0);
-
-      }, 0)
-
-    }
+    presupuestos: Object.fromEntries(
+      Object.entries(presupuestos).map(([k, v]) => [k, v.type])
+    )
 
   };
 
@@ -113,22 +69,18 @@ export default async function handler(req, res) {
 
   try {
 
-    const datos = await obtenerDatos();
+    const estructura = await obtenerEstructura();
 
     res.status(200).json({
       ok: true,
-      actualizado: new Date().toISOString(),
-      datos
+      estructura
     });
 
   } catch (error) {
 
-    console.error(error);
-
     res.status(500).json({
       ok: false,
-      error: error.message,
-      stack: error.stack
+      error: error.message
     });
 
   }
