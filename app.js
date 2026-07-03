@@ -1,0 +1,1 @@
+document.getElementById('estado').textContent='Pendiente de conectar con Notion API';
