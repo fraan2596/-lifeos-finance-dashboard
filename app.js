@@ -7,87 +7,89 @@ async function cargarDashboard() {
     const respuesta = await fetch(API_URL);
 
     if (!respuesta.ok) {
-      throw new Error("No se pudo conectar con el backend");
+      throw new Error("No se pudo obtener la información");
     }
 
-    const datos = await respuesta.json();
+    const json = await respuesta.json();
 
-    console.log("Datos recibidos:", datos);
+    console.log(json);
 
-    mostrarResumen(datos.datos.resumen);
+    actualizarDashboard(json.datos);
 
   } catch (error) {
 
     console.error(error);
 
-    document.body.innerHTML += `
-      <div style="
-        background:#ffebee;
-        color:#b71c1c;
-        padding:20px;
-        margin:20px;
-        border-radius:12px;
-        font-family:sans-serif;
-      ">
-        Error cargando el Dashboard<br><br>
-        ${error.message}
-      </div>
-    `;
+    document.getElementById("estado").textContent =
+      "❌ Error cargando datos";
 
   }
 
 }
 
-function mostrarResumen(resumen) {
+function actualizarDashboard(datos) {
 
-  const patrimonio =
-    document.getElementById("patrimonio");
+  const resumen = datos.resumen;
 
-  const cuentas =
-    document.getElementById("cuentas");
+  document.getElementById("patrimonio").textContent =
+    formatearDinero(resumen.patrimonio);
 
-  const movimientos =
-    document.getElementById("movimientos");
+  document.getElementById("cuentas").textContent =
+    resumen.totalCuentas;
 
-  const categorias =
-    document.getElementById("categorias");
+  document.getElementById("movimientos").textContent =
+    resumen.totalMovimientos;
 
-  const presupuestos =
-    document.getElementById("presupuestos");
+  document.getElementById("categorias").textContent =
+    resumen.totalCategorias;
 
-  if (patrimonio)
-    patrimonio.textContent =
-      formatearDinero(resumen.patrimonio);
+  document.getElementById("presupuestos").textContent =
+    resumen.totalPresupuestos;
 
-  if (cuentas)
-    cuentas.textContent =
-      formatearNumero(resumen.totalCuentas);
+  document.getElementById("liquidez").textContent =
+    formatearDinero(resumen.patrimonio);
 
-  if (movimientos)
-    movimientos.textContent =
-      formatearNumero(resumen.totalMovimientos);
+  let estado = "🟢 Saludable";
 
-  if (categorias)
-    categorias.textContent =
-      formatearNumero(resumen.totalCategorias);
+  if (resumen.patrimonio < 0)
+    estado = "🔴 Patrimonio negativo";
 
-  if (presupuestos)
-    presupuestos.textContent =
-      formatearNumero(resumen.totalPresupuestos);
+  document.getElementById("estado").textContent =
+    estado;
+
+  generarAlertas(resumen);
 
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function generarAlertas(resumen) {
 
-  console.log("🚀 LifeOS Finance iniciado");
+  const alertas = [];
 
-  cargarDashboard();
+  if (resumen.totalMovimientos === 0) {
+    alertas.push("⚠️ No hay movimientos registrados.");
+  }
 
-});
+  if (resumen.totalPresupuestos === 0) {
+    alertas.push("📑 No hay presupuestos creados.");
+  }
 
-// =========================
-// FUNCIONES AUXILIARES
-// =========================
+  if (resumen.totalCategorias === 0) {
+    alertas.push("📂 No hay categorías creadas.");
+  }
+
+  if (resumen.totalCuentas === 0) {
+    alertas.push("🏦 No hay cuentas registradas.");
+  }
+
+  if (resumen.patrimonio < 0) {
+    alertas.push("🔴 Tu patrimonio es negativo.");
+  }
+
+  document.getElementById("alertas").innerHTML =
+    alertas.length
+      ? alertas.join("<br>")
+      : "✅ Todo correcto.";
+}
 
 function formatearDinero(valor) {
 
@@ -98,8 +100,8 @@ function formatearDinero(valor) {
 
 }
 
-function formatearNumero(valor) {
+document.addEventListener("DOMContentLoaded", () => {
 
-  return new Intl.NumberFormat("es-ES").format(valor);
+  cargarDashboard();
 
-}
+});
