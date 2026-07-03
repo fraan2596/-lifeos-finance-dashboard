@@ -13,30 +13,11 @@ const DATABASES = {
 
 async function obtenerCuentas() {
 
-  const response = await notion.databases.query({
+  const response = await notion.databases.retrieve({
     database_id: DATABASES.cuentas,
   });
 
-  return response.results.map((page) => ({
-
-    id: page.id,
-
-    nombre:
-      page.properties.Nombre?.title?.[0]?.plain_text ??
-      "Sin nombre",
-
-    tipo:
-      page.properties.Tipo?.select?.name ??
-      "",
-
-    saldo:
-      page.properties.Saldo?.number ??
-      0,
-
-    ultimaActualizacion:
-      page.last_edited_time
-
-  }));
+  return response;
 
 }
 
