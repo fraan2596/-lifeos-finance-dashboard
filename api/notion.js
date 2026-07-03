@@ -10,11 +10,21 @@ export default async function handler(req, res) {
       page_size: 100,
     });
 
-    return res.status(200).json(response);
+    const resultado = response.results.map((item) => ({
+      id: item.id,
+      object: item.object,
+      title:
+        item.title?.[0]?.plain_text ||
+        item.properties?.title?.title?.[0]?.plain_text ||
+        item.url ||
+        "Sin título"
+    }));
+
+    res.status(200).json(resultado);
 
   } catch (error) {
-    return res.status(500).json({
-      error: error.message,
+    res.status(500).json({
+      error: error.message
     });
   }
 }
