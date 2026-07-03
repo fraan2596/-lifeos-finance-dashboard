@@ -5,14 +5,13 @@ const notion = new Client({
 });
 
 export default async function handler(req, res) {
-
   try {
 
-    const page = await notion.pages.retrieve({
-      page_id: "38c69496-804b-807e-9551-d93fd30f4cb8"
+    const blocks = await notion.blocks.children.list({
+      block_id: "38c69496-804b-807e-9551-d93fd30f4cb8"
     });
 
-    res.status(200).json(page);
+    res.status(200).json(blocks.results);
 
   } catch (error) {
 
@@ -21,5 +20,4 @@ export default async function handler(req, res) {
     });
 
   }
-
 }
