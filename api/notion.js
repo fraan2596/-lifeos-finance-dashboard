@@ -4,18 +4,30 @@ const notion = new Client({
   auth: process.env.NOTION_TOKEN,
 });
 
+// 👇 CAMBIA ESTE ID CADA VEZ
+const PAGE_ID = "38c69496-804b-807e-9551-d93fd30f4cb8";
+
 export default async function handler(req, res) {
   try {
 
-    const response = await notion.databases.query({
-      database_id: "39269496-804b-8036-9e2d-c8b25134ee2d"
+    const bloques = await notion.blocks.children.list({
+      block_id: PAGE_ID,
+      page_size: 100
     });
 
-    res.status(200).json(response);
+    const databases = bloques.results
+      .filter(b => b.type === "child_database")
+      .map(b => ({
+        id: b.id,
+        titulo: b.child_database.title
+      }));
+
+    res.status(200).json(databases);
 
   } catch (error) {
 
     res.status(500).json({
+      ok: false,
       error: error.message
     });
 
