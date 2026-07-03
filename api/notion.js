@@ -5,7 +5,7 @@ const notion = new Client({
 });
 
 // 👇 CAMBIA ESTE ID CADA VEZ
-const PAGE_ID = "38c69496-804b-807e-9551-d93fd30f4cb8";
+const PAGE_ID = "38c69496-804b-8027-b549-e35fb25c8232";
 
 export default async function handler(req, res) {
   try {
