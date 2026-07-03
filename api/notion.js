@@ -5,26 +5,21 @@ const notion = new Client({
 });
 
 export default async function handler(req, res) {
+
   try {
-    const response = await notion.search({
-      page_size: 100,
+
+    const page = await notion.pages.retrieve({
+      page_id: "38c69496-804b-807e-9551-d93fd30f4cb8"
     });
 
-    const resultado = response.results.map((item) => ({
-      id: item.id,
-      object: item.object,
-      title:
-        item.title?.[0]?.plain_text ||
-        item.properties?.title?.title?.[0]?.plain_text ||
-        item.url ||
-        "Sin título"
-    }));
-
-    res.status(200).json(resultado);
+    res.status(200).json(page);
 
   } catch (error) {
+
     res.status(500).json({
       error: error.message
     });
+
   }
+
 }
