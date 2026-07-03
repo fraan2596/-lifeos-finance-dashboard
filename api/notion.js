@@ -6,15 +6,18 @@ const notion = new Client({
 
 export default async function handler(req, res) {
   try {
-    const response = await notion.databases.retrieve({
-      database_id: "39269496804b80d7a237ddad1ea20f58"
+    const response = await notion.search({
+      filter: {
+        property: "object",
+        value: "database",
+      },
     });
 
     return res.status(200).json(response);
 
   } catch (error) {
     return res.status(500).json({
-      error: error.message
+      error: error.message,
     });
   }
 }
