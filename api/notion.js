@@ -7,11 +7,11 @@ const notion = new Client({
 export default async function handler(req, res) {
   try {
 
-    const blocks = await notion.blocks.children.list({
-      block_id: "38c69496-804b-807e-9551-d93fd30f4cb8"
+    const response = await notion.databases.query({
+      database_id: "39269496-804b-8036-9e2d-c8b25134ee2d"
     });
 
-    res.status(200).json(blocks.results);
+    res.status(200).json(response);
 
   } catch (error) {
 
