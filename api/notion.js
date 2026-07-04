@@ -12,7 +12,7 @@ const DATABASES = {
 };
 
 /* =========================
-   FETCH PAGINADO NOTION
+   FETCH PAGINADO
 ========================= */
 async function obtenerTodos(databaseId) {
   let resultados = [];
@@ -43,7 +43,7 @@ const seleccion = (p) => p?.select?.name ?? "";
 const fecha = (p) => p?.date?.start ?? null;
 
 /* =========================
-   CORE LIFEOS
+   CORE
 ========================= */
 async function cargarLifeOS() {
   const [
@@ -59,25 +59,17 @@ async function cargarLifeOS() {
   ]);
 
   /* =========================
-     CUENTAS
+     CUENTAS BASE
   ========================= */
   const cuentas = cuentasRaw.map((c) => ({
     id: c.id,
-
     nombre: titulo(c.properties["Nombre"]),
     entidad: texto(c.properties["Entidad"]),
     tipo: seleccion(c.properties["Tipo"]),
-
     saldoInicial: numero(c.properties["Saldo inicial"]),
     saldoActual: formulaNumero(c.properties["Saldo Actual"]),
-
     bancoPrincipal: c.properties["Banco principal"]?.checkbox ?? false,
   }));
-
-  const patrimonio = cuentas.reduce(
-    (acc, c) => acc + (c.saldoActual || 0),
-    0
-  );
 
   /* =========================
      CATEGORÍAS
@@ -88,7 +80,7 @@ async function cargarLifeOS() {
   }));
 
   /* =========================
-     MOVIMIENTOS (TU MODELO REAL)
+     MOVIMIENTOS (TU MODELO)
   ========================= */
   const movimientos = movimientosRaw.map((mov) => ({
     id: mov.id,
@@ -122,21 +114,16 @@ async function cargarLifeOS() {
   ========================= */
   const presupuestos = presupuestosRaw.map((pre) => ({
     id: pre.id,
-
     nombre: titulo(pre.properties["Nombre"]),
-
     categoria:
       pre.properties["Categoria"]?.relation?.[0]?.id ?? null,
-
     limite: numero(pre.properties["Límite"]),
-
     gastado: formulaNumero(pre.properties["Gastado"]) ?? 0,
-
     periodo: seleccion(pre.properties["Periodo"]),
   }));
 
   /* =========================
-     KPIs
+     KPIs GLOBALS
   ========================= */
   const ingresos = movimientos
     .filter((m) => m.tipo === "💰Ingreso")
@@ -158,11 +145,87 @@ async function cargarLifeOS() {
     .filter((m) => m.tipo === "🔁Transferencia")
     .reduce((acc, m) => acc + m.importe, 0);
 
+  const patrimonioGlobal = cuentas.reduce(
+    (acc, c) => acc + (c.saldoActual || 0),
+    0
+  );
+
+  /* =========================
+     💳 SISTEMA POR CUENTAS (CASH + PATRIMONIO)
+  ========================= */
+  const cuentasMap = {};
+
+  cuentas.forEach((c) => {
+    cuentasMap[c.id] = {
+      id: c.id,
+      nombre: c.nombre,
+      entidad: c.entidad,
+      tipo: c.tipo,
+      saldoInicial: c.saldoInicial,
+      cash: c.saldoInicial,
+      patrimonio: c.saldoInicial,
+    };
+  });
+
+  for (const m of movimientos) {
+    const o = m.cuentaOrigen;
+    const d = m.cuentaDestino;
+
+    // INGRESOS
+    if (m.tipo === "💰Ingreso") {
+      if (o && cuentasMap[o]) {
+        cuentasMap[o].cash += m.importe;
+        cuentasMap[o].patrimonio += m.importe;
+      }
+    }
+
+    // GASTOS
+    if (m.tipo === "💸Gasto") {
+      if (o && cuentasMap[o]) {
+        cuentasMap[o].cash -= m.importe;
+        cuentasMap[o].patrimonio -= m.importe;
+      }
+    }
+
+    // TRANSFERENCIAS
+    if (m.tipo === "🔁Transferencia") {
+      if (o && cuentasMap[o]) {
+        cuentasMap[o].cash -= m.importe;
+      }
+      if (d && cuentasMap[d]) {
+        cuentasMap[d].cash += m.importe;
+      }
+    }
+
+    // AHORRO
+    if (m.tipo === "🎯Ahorro") {
+      if (o && cuentasMap[o]) {
+        cuentasMap[o].cash -= m.importe;
+        cuentasMap[o].patrimonio += m.importe;
+      }
+      if (d && cuentasMap[d]) {
+        cuentasMap[d].patrimonio += m.importe;
+      }
+    }
+
+    // INVERSION
+    if (m.tipo === "📈Inversión") {
+      if (o && cuentasMap[o]) {
+        cuentasMap[o].cash -= m.importe;
+      }
+      if (d && cuentasMap[d]) {
+        cuentasMap[d].patrimonio += m.importe;
+      }
+    }
+  }
+
+  const cuentasFinal = Object.values(cuentasMap);
+
   /* =========================
      RETURN FINAL
   ========================= */
   return {
-    cuentas,
+    cuentas: cuentasFinal,
     categorias,
     movimientos,
     presupuestos,
@@ -173,13 +236,13 @@ async function cargarLifeOS() {
       ahorro,
       inversiones,
       transfers,
-      patrimonio,
+      patrimonio: patrimonioGlobal,
     },
   };
 }
 
 /* =========================
-   EXPORT API (VERCEL)
+   API HANDLER (VERCEL)
 ========================= */
 export default async function handler(req, res) {
   try {
@@ -189,7 +252,6 @@ export default async function handler(req, res) {
       ok: true,
       data,
     });
-
   } catch (error) {
     return res.status(500).json({
       ok: false,
