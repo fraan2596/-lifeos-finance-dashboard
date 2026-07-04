@@ -167,3 +167,19 @@ async function cargarLifeOS() {
 export async function getLifeOS() {
   return await cargarLifeOS();
 }
+export default async function handler(req, res) {
+  try {
+    const data = await cargarLifeOS();
+
+    return res.status(200).json({
+      ok: true,
+      data,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+}
