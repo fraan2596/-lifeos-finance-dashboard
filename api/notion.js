@@ -11,162 +11,176 @@ const DATABASES = {
   presupuestos: "38f69496-804b-80a6-8a42-f34225e8acf9",
 };
 
+/* =========================
+   FETCH PAGINADO NOTION
+========================= */
 async function obtenerTodos(databaseId) {
   let resultados = [];
   let cursor = undefined;
 
   do {
-    const respuesta = await notion.databases.query({
+    const res = await notion.databases.query({
       database_id: databaseId,
       page_size: 100,
       start_cursor: cursor,
     });
 
-    resultados.push(...respuesta.results);
-
-    cursor = respuesta.has_more
-      ? respuesta.next_cursor
-      : undefined;
-
+    resultados.push(...res.results);
+    cursor = res.has_more ? res.next_cursor : undefined;
   } while (cursor);
 
   return resultados;
 }
 
-function titulo(propiedad) {
-  return propiedad?.title?.[0]?.plain_text ?? "";
-}
+/* =========================
+   HELPERS
+========================= */
+const titulo = (p) => p?.title?.[0]?.plain_text ?? "";
+const texto = (p) => p?.rich_text?.[0]?.plain_text ?? "";
+const numero = (p) => p?.number ?? 0;
+const formulaNumero = (p) => p?.formula?.number ?? 0;
+const seleccion = (p) => p?.select?.name ?? "";
+const fecha = (p) => p?.date?.start ?? null;
 
-function texto(propiedad) {
-  return propiedad?.rich_text?.[0]?.plain_text ?? "";
-}
-
-function numero(propiedad) {
-  return propiedad?.number ?? 0;
-}
-
-function formulaNumero(propiedad) {
-  return propiedad?.formula?.number ?? 0;
-}
-
-function seleccion(propiedad) {
-  return propiedad?.select?.name ?? "";
-}
-
-function fecha(propiedad) {
-  return propiedad?.date?.start ?? null;
-}
-
+/* =========================
+   CORE LIFEOS
+========================= */
 async function cargarLifeOS() {
   const [
     cuentasRaw,
     categoriasRaw,
     movimientosRaw,
-    presupuestosRaw
+    presupuestosRaw,
   ] = await Promise.all([
     obtenerTodos(DATABASES.cuentas),
     obtenerTodos(DATABASES.categorias),
     obtenerTodos(DATABASES.movimientos),
-    obtenerTodos(DATABASES.presupuestos)
+    obtenerTodos(DATABASES.presupuestos),
   ]);
 
-  const cuentas = cuentasRaw.map(cuenta => ({
-    id: cuenta.id,
+  /* =========================
+     CUENTAS
+  ========================= */
+  const cuentas = cuentasRaw.map((c) => ({
+    id: c.id,
 
-    nombre:
-      titulo(cuenta.properties["Nombre"]),
+    nombre: titulo(c.properties["Nombre"]),
+    entidad: texto(c.properties["Entidad"]),
+    tipo: seleccion(c.properties["Tipo"]),
 
-    entidad:
-      texto(cuenta.properties["Entidad"]),
+    saldoInicial: numero(c.properties["Saldo inicial"]),
+    saldoActual: formulaNumero(c.properties["Saldo Actual"]),
 
-    tipo:
-      seleccion(cuenta.properties["Tipo"]),
-
-    saldoInicial:
-      numero(cuenta.properties["Saldo inicial"]),
-
-    saldoActual:
-      formulaNumero(cuenta.properties["Saldo Actual"]),
-
-    bancoPrincipal:
-      cuenta.properties["Banco principal"]?.checkbox ?? false
+    bancoPrincipal: c.properties["Banco principal"]?.checkbox ?? false,
   }));
 
   const patrimonio = cuentas.reduce(
-    (total, cuenta) => total + cuenta.saldoActual,
+    (acc, c) => acc + (c.saldoActual || 0),
     0
   );
 
-  const categorias = categoriasRaw.map(categoria => ({
-    id: categoria.id,
-
-    nombre:
-      titulo(categoria.properties["Nombre"]),
-
-    tipo:
-      seleccion(categoria.properties["Tipo"]),
-
-    color:
-      seleccion(categoria.properties["Color"]) || null,
+  /* =========================
+     CATEGORÍAS
+  ========================= */
+  const categorias = categoriasRaw.map((cat) => ({
+    id: cat.id,
+    categoria: titulo(cat.properties["Categoría"]),
   }));
 
-  const movimientos = movimientosRaw.map(mov => ({
+  /* =========================
+     MOVIMIENTOS (TU MODELO REAL)
+  ========================= */
+  const movimientos = movimientosRaw.map((mov) => ({
     id: mov.id,
 
-    descripcion:
-      titulo(mov.properties["Descripción"]) ||
-      texto(mov.properties["Descripción"]),
+    concepto: titulo(mov.properties["Concepto"]),
 
-    importe:
-      numero(mov.properties["Importe"]),
+    importe: numero(mov.properties["Importe"]),
 
-    tipo:
-      seleccion(mov.properties["Tipo"]),
+    tipo: seleccion(mov.properties["Tipo"]),
 
-    fecha:
-      fecha(mov.properties["Fecha"]),
+    fecha: fecha(mov.properties["Fecha"]),
 
-    cuenta:
-      mov.properties["Cuenta"]?.relation?.[0]?.id ?? null,
+    cuentaOrigen:
+      mov.properties["Cuenta origen"]?.relation?.[0]?.id ?? null,
+
+    cuentaDestino:
+      mov.properties["Cuenta destino"]?.relation?.[0]?.id ?? null,
 
     categoria:
       mov.properties["Categoría"]?.relation?.[0]?.id ?? null,
+
+    grupo:
+      mov.properties["Grupos"]?.rollup?.array ?? [],
 
     esRecurrente:
       mov.properties["Recurrente"]?.checkbox ?? false,
   }));
 
-  const presupuestos = presupuestosRaw.map(pre => ({
+  /* =========================
+     PRESUPUESTOS
+  ========================= */
+  const presupuestos = presupuestosRaw.map((pre) => ({
     id: pre.id,
 
-    nombre:
-      titulo(pre.properties["Nombre"]),
+    nombre: titulo(pre.properties["Nombre"]),
 
     categoria:
-      pre.properties["Categoría"]?.relation?.[0]?.id ?? null,
+      pre.properties["Categoria"]?.relation?.[0]?.id ?? null,
 
-    importeLimite:
-      numero(pre.properties["Límite"]),
+    limite: numero(pre.properties["Límite"]),
 
-    gastado:
-      formulaNumero(pre.properties["Gastado"]) ?? 0,
+    gastado: formulaNumero(pre.properties["Gastado"]) ?? 0,
 
-    periodo:
-      seleccion(pre.properties["Periodo"]),
+    periodo: seleccion(pre.properties["Periodo"]),
   }));
 
+  /* =========================
+     KPIs
+  ========================= */
+  const ingresos = movimientos
+    .filter((m) => m.tipo === "💰Ingreso")
+    .reduce((acc, m) => acc + m.importe, 0);
+
+  const gastos = movimientos
+    .filter((m) => m.tipo === "💸Gasto")
+    .reduce((acc, m) => acc + m.importe, 0);
+
+  const ahorro = movimientos
+    .filter((m) => m.tipo === "🎯Ahorro")
+    .reduce((acc, m) => acc + m.importe, 0);
+
+  const inversiones = movimientos
+    .filter((m) => m.tipo === "📈Inversión")
+    .reduce((acc, m) => acc + m.importe, 0);
+
+  const transfers = movimientos
+    .filter((m) => m.tipo === "🔁Transferencia")
+    .reduce((acc, m) => acc + m.importe, 0);
+
+  /* =========================
+     RETURN FINAL
+  ========================= */
   return {
     cuentas,
     categorias,
     movimientos,
     presupuestos,
-    patrimonio,
+
+    kpis: {
+      ingresos,
+      gastos,
+      ahorro,
+      inversiones,
+      transfers,
+      patrimonio,
+    },
   };
 }
 
-export async function getLifeOS() {
-  return await cargarLifeOS();
-}
+/* =========================
+   EXPORT API (VERCEL)
+========================= */
 export default async function handler(req, res) {
   try {
     const data = await cargarLifeOS();
@@ -178,6 +192,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     return res.status(500).json({
+      ok: false,
       error: error.message,
       stack: error.stack,
     });
